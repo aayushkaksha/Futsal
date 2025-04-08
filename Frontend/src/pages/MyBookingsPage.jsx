@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FaCalendarAlt, FaClock, FaMapMarkerAlt, FaMoneyBillWave, FaTrash } from 'react-icons/fa';
-import { bookingAPI } from '../utils/api';
-import LoadingSpinner from '../components/ui/LoadingSpinner';
+import { FaCalendarAlt, FaClock, FaMapMarkerAlt, FaMoneyBillWave, FaTrash, FaUsers, FaFootballBall } from 'react-icons/fa';
 import { toast } from 'react-toastify';
+import { format } from 'date-fns';
 
 const MyBookingsPage = () => {
   const [bookings, setBookings] = useState([]);
@@ -19,11 +18,22 @@ const MyBookingsPage = () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await bookingAPI.getUserBookings();
+      
+      const response = await fetch('/api/bookings', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch bookings');
+      }
+      
+      const data = await response.json();
       setBookings(data.data);
     } catch (error) {
       console.error('Error fetching bookings:', error);
-      setError(error.response?.data?.message || 'Failed to load your bookings. Please try again.');
+      setError(error.message || 'Failed to load your bookings. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -36,22 +46,35 @@ const MyBookingsPage = () => {
 
     try {
       setCancellingId(bookingId);
-      await bookingAPI.cancelBooking(bookingId);
+      
+      const response = await fetch(`/api/bookings/${bookingId}/cancel`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          reason: 'Cancelled by user'
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to cancel booking');
+      }
+      
       toast.success('Booking cancelled successfully');
-      // Remove the cancelled booking from the list
-      setBookings(bookings.filter(booking => booking._id !== bookingId));
+      // Update the booking in the list
+      fetchBookings();
     } catch (err) {
       console.error('Error cancelling booking:', err);
-      const errorMessage = err.response?.data?.message || 'Failed to cancel booking';
-      toast.error(errorMessage);
+      toast.error(err.message || 'Failed to cancel booking');
     } finally {
       setCancellingId(null);
     }
   };
 
   const formatDate = (dateString) => {
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    return new Date(dateString).toLocaleDateString('en-US', options);
+    return format(new Date(dateString), 'EEEE, MMMM d, yyyy');
   };
 
   const getStatusBadgeClass = (status) => {
@@ -71,10 +94,10 @@ const MyBookingsPage = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background py-12">
+      <div className="min-h-screen bg-gray-50 py-12">
         <div className="container mx-auto px-4">
           <div className="flex flex-col items-center justify-center py-12">
-            <LoadingSpinner size="lg" />
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
             <p className="mt-4 text-gray-600">Loading your bookings...</p>
           </div>
         </div>
@@ -84,7 +107,7 @@ const MyBookingsPage = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background py-12">
+      <div className="min-h-screen bg-gray-50 py-12">
         <div className="container mx-auto px-4">
           <div className="bg-white rounded-lg shadow-md p-6">
             <div className="text-center py-8">
@@ -95,7 +118,7 @@ const MyBookingsPage = () => {
               <p className="text-gray-600 mb-6">{error}</p>
               <button 
                 onClick={fetchBookings}
-                className="btn btn-primary"
+                className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
               >
                 Try Again
               </button>
@@ -108,7 +131,7 @@ const MyBookingsPage = () => {
 
   if (bookings.length === 0) {
     return (
-      <div className="min-h-screen bg-background py-12">
+      <div className="min-h-screen bg-gray-50 py-12">
         <div className="container mx-auto px-4">
           <h1 className="text-3xl font-bold text-center mb-8">My Bookings</h1>
           <div className="bg-white rounded-lg shadow-md p-6">
@@ -118,7 +141,7 @@ const MyBookingsPage = () => {
               </div>
               <h2 className="text-2xl font-bold mb-2">No Bookings Found</h2>
               <p className="text-gray-600 mb-6">You haven't made any bookings yet.</p>
-              <Link to="/booking" className="btn btn-primary">
+              <Link to="/booking" className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
                 Book Now
               </Link>
             </div>
@@ -129,11 +152,11 @@ const MyBookingsPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background py-12">
+    <div className="min-h-screen bg-gray-50 py-12">
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">My Bookings</h1>
-          <Link to="/booking" className="btn btn-primary">
+          <Link to="/booking" className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
             Book New Slot
           </Link>
         </div>
@@ -159,24 +182,43 @@ const MyBookingsPage = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                   <div className="flex items-start">
-                    <FaClock className="mr-2 mt-1 text-primary" />
+                    <FaClock className="mr-2 mt-1 text-indigo-600" />
                     <div>
                       <p className="text-sm text-gray-600">Time</p>
-                      <p className="font-medium">{booking.timeSlot.startTime} - {booking.timeSlot.endTime}</p>
+                      <p className="font-medium">{booking.startTime} - {booking.endTime}</p>
+                      <p className="text-sm text-gray-500">{booking.duration} hour(s)</p>
                     </div>
                   </div>
                   <div className="flex items-start">
-                    <FaMapMarkerAlt className="mr-2 mt-1 text-primary" />
+                    <FaMapMarkerAlt className="mr-2 mt-1 text-indigo-600" />
                     <div>
                       <p className="text-sm text-gray-600">Court</p>
-                      <p className="font-medium">Main Futsal Court</p>
+                      <p className="font-medium">{booking.court?.name || "Court unavailable"}</p>
                     </div>
                   </div>
                   <div className="flex items-start">
-                    <FaMoneyBillWave className="mr-2 mt-1 text-primary" />
+                    <FaMoneyBillWave className="mr-2 mt-1 text-indigo-600" />
                     <div>
                       <p className="text-sm text-gray-600">Price</p>
-                      <p className="font-medium">Rs. {booking.timeSlot.price}</p>
+                      <p className="font-medium">Rs. {booking.price}</p>
+                      <p className="text-xs text-gray-500">{booking.paymentStatus}</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div className="flex items-start">
+                    <FaUsers className="mr-2 mt-1 text-indigo-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Players</p>
+                      <p className="font-medium">{booking.numberOfPlayers} players</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start">
+                    <FaFootballBall className="mr-2 mt-1 text-indigo-600" />
+                    <div>
+                      <p className="text-sm text-gray-600">Equipment</p>
+                      <p className="font-medium">{booking.equipment ? 'Included' : 'Not included'}</p>
                     </div>
                   </div>
                 </div>
@@ -188,21 +230,19 @@ const MyBookingsPage = () => {
                   </div>
                 )}
 
-                {booking.status === 'confirmed' && (
+                {booking.status !== 'cancelled' && booking.status !== 'completed' && (
                   <div className="flex justify-end">
                     <button
                       onClick={() => handleCancelBooking(booking._id)}
                       disabled={cancellingId === booking._id}
-                      className="btn btn-outline text-red-500 border-red-500 hover:bg-red-500 hover:text-white"
+                      className="px-4 py-2 border border-red-500 text-red-500 rounded hover:bg-red-500 hover:text-white transition"
                     >
                       {cancellingId === booking._id ? (
-                        <LoadingSpinner size="sm" color="red" />
+                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-red-500 inline-block mr-2"></div>
                       ) : (
-                        <>
-                          <FaTrash className="mr-2" />
-                          Cancel Booking
-                        </>
+                        <FaTrash className="inline-block mr-2" />
                       )}
+                      Cancel Booking
                     </button>
                   </div>
                 )}

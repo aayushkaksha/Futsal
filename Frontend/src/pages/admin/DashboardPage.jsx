@@ -3,18 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import BookingList from '../../components/booking/BookingList';
 import { toast } from 'react-toastify';
-import adminAPI from '../../services/adminAPI';
 
-const AdminDashboardPage = () => {
+const DashboardPage = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalBookings: 0,
+    totalRevenue: 0,
     pendingBookings: 0,
     confirmedBookings: 0,
     cancelledBookings: 0,
-    completedBookings: 0,
-    todayBookings: 0
+    completedBookings: 0
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -27,24 +26,41 @@ const AdminDashboardPage = () => {
       return;
     }
 
-    fetchDashboardData();
+    fetchStats();
   }, [user, navigate]);
 
-  const fetchDashboardData = async () => {
+  const fetchStats = async () => {
     try {
       setLoading(true);
       setError(null);
+      
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
 
-      const data = await adminAPI.getBookingStats();
+      const response = await fetch('/api/admin/bookings/stats', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to fetch statistics');
+      }
+
+      const data = await response.json();
       
       // Transform status stats into the required format
       const transformedStats = {
         totalBookings: data.totalBookings || 0,
+        totalRevenue: 0, // We'll calculate this from the status stats
         pendingBookings: 0,
         confirmedBookings: 0,
         cancelledBookings: 0,
-        completedBookings: 0,
-        todayBookings: data.todayBookings || 0
+        completedBookings: 0
       };
 
       // Process status stats
@@ -71,7 +87,7 @@ const AdminDashboardPage = () => {
 
       setStats(transformedStats);
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('Error fetching dashboard statistics:', error);
       setError(error.message);
       toast.error(error.message);
     } finally {
@@ -94,7 +110,7 @@ const AdminDashboardPage = () => {
           <h2 className="text-xl font-semibold text-red-700 mb-2">Error Loading Dashboard</h2>
           <p className="text-red-600 mb-4">{error}</p>
           <button
-            onClick={fetchDashboardData}
+            onClick={fetchStats}
             className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
           >
             Try Again
@@ -140,23 +156,17 @@ const AdminDashboardPage = () => {
         
         <div className="bg-white p-6 rounded-lg shadow-md">
           <p className="text-gray-500 text-sm font-medium">Today's Bookings</p>
-          <p className="text-3xl font-bold text-indigo-500">{stats.todayBookings}</p>
+          <p className="text-3xl font-bold text-indigo-500">{stats.todayBookings || 0}</p>
         </div>
       </div>
 
       {/* Booking Management */}
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h2 className="text-2xl font-bold mb-6">Booking Management</h2>
-        <BookingList 
-          isAdmin={true} 
-          onError={(error) => toast.error(error)}
-          fetchBookings={adminAPI.getAllBookings}
-          onStatusUpdate={adminAPI.updateBookingStatus}
-          onDelete={adminAPI.deleteBooking}
-        />
+        <BookingList isAdmin={true} onError={(error) => toast.error(error)} />
       </div>
     </div>
   );
 };
 
-export default AdminDashboardPage; 
+export default DashboardPage; 

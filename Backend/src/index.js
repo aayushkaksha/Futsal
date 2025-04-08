@@ -11,6 +11,8 @@ import authRoutes from './routes/auth.js';
 import bookingRoutes from './routes/booking.js';
 import userRoutes from './routes/user.js';
 import timeSlotRoutes from './routes/timeSlot.js';
+import courtRoutes from './routes/court.js';
+import adminBookingRoutes from './routes/adminBookingRoutes.js';
 
 // Import error handler middleware
 import { errorHandler } from './middleware/errorHandler.js';
@@ -36,6 +38,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/timeslots', timeSlotRoutes);
+app.use('/api/courts', courtRoutes);
+app.use('/api/admin/bookings', adminBookingRoutes);
 
 // Use error handler middleware
 app.use(errorHandler);

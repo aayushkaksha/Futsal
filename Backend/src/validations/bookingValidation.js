@@ -1,106 +1,55 @@
+import Joi from 'joi';
+
 // Validation middleware for booking routes
 export const validateCreateBooking = (req, res, next) => {
-  const { date, startTime, endTime, duration, price } = req.body;
-  const errors = [];
+  const schema = Joi.object({
+    court: Joi.string().hex().length(24).required(),
+    date: Joi.date().min('now').required(),
+    startTime: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).required(),
+    endTime: Joi.string().pattern(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).required(),
+    duration: Joi.number().min(1).max(4).required(),
+    numberOfPlayers: Joi.number().min(1).max(10).required(),
+    equipment: Joi.boolean().default(false),
+    notes: Joi.string().max(500).allow('')
+  });
 
-  // Validate date
-  if (!date) {
-    errors.push('Date is required');
-  } else {
-    const dateObj = new Date(date);
-    if (isNaN(dateObj.getTime())) {
-      errors.push('Please provide a valid date');
-    } else if (dateObj < new Date().setHours(0, 0, 0, 0)) {
-      errors.push('Booking date cannot be in the past');
-    }
+  const { error } = schema.validate(req.body);
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      message: error.details[0].message
+    });
   }
 
-  // Validate start time
-  if (!startTime) {
-    errors.push('Start time is required');
-  } else {
-    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
-    if (!timeRegex.test(startTime)) {
-      errors.push('Start time should be in HH:MM format');
-    }
-  }
-
-  // Validate end time
-  if (!endTime) {
-    errors.push('End time is required');
-  } else {
-    const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
-    if (!timeRegex.test(endTime)) {
-      errors.push('End time should be in HH:MM format');
-    }
-  }
-
-  // Validate duration
-  if (!duration) {
-    errors.push('Duration is required');
-  } else if (isNaN(duration) || duration <= 0) {
-    errors.push('Duration must be a positive number');
-  }
-
-  // Validate price
-  if (!price) {
-    errors.push('Price is required');
-  } else if (isNaN(price) || price < 0) {
-    errors.push('Price must be a non-negative number');
-  }
-
-  // Check if start time is before end time
-  if (startTime && endTime) {
-    const [startHour, startMinute] = startTime.split(':').map(Number);
-    const [endHour, endMinute] = endTime.split(':').map(Number);
-    
-    const startMinutes = startHour * 60 + startMinute;
-    const endMinutes = endHour * 60 + endMinute;
-    
-    if (startMinutes >= endMinutes) {
-      errors.push('End time must be after start time');
-    }
-  }
-
-  // Return errors if any
-  if (errors.length > 0) {
-    return res.status(400).json({ success: false, errors });
+  // Validate that endTime is after startTime
+  const startTime = new Date(`2000-01-01T${req.body.startTime}`);
+  const endTime = new Date(`2000-01-01T${req.body.endTime}`);
+  
+  if (endTime <= startTime) {
+    return res.status(400).json({
+      success: false,
+      message: 'End time must be after start time'
+    });
   }
 
   next();
 };
 
 export const validateUpdateBooking = (req, res, next) => {
-  const { status, paymentStatus, paymentMethod } = req.body;
-  const errors = [];
+  const schema = Joi.object({
+    status: Joi.string().valid('pending', 'confirmed', 'cancelled', 'completed'),
+    paymentStatus: Joi.string().valid('unpaid', 'paid', 'refunded'),
+    paymentMethod: Joi.string().valid('cash', 'online', 'card', ''),
+    notes: Joi.string().max(500).allow(''),
+    cancellationReason: Joi.string().max(500).allow('')
+  });
 
-  // Validate status if provided
-  if (status !== undefined) {
-    const validStatuses = ['pending', 'confirmed', 'cancelled'];
-    if (!validStatuses.includes(status)) {
-      errors.push('Invalid status value');
-    }
-  }
-
-  // Validate payment status if provided
-  if (paymentStatus !== undefined) {
-    const validPaymentStatuses = ['unpaid', 'paid'];
-    if (!validPaymentStatuses.includes(paymentStatus)) {
-      errors.push('Invalid payment status value');
-    }
-  }
-
-  // Validate payment method if provided
-  if (paymentMethod !== undefined) {
-    const validPaymentMethods = ['cash', 'online', ''];
-    if (!validPaymentMethods.includes(paymentMethod)) {
-      errors.push('Invalid payment method value');
-    }
-  }
-
-  // Return errors if any
-  if (errors.length > 0) {
-    return res.status(400).json({ success: false, errors });
+  const { error } = schema.validate(req.body);
+  if (error) {
+    return res.status(400).json({
+      success: false,
+      message: error.details[0].message
+    });
   }
 
   next();
