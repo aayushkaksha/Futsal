@@ -15,7 +15,7 @@ const courtSchema = new mongoose.Schema({
     type: Number,
     required: [true, 'Please provide court capacity'],
     min: [1, 'Minimum capacity is 1 player'],
-    max: [10, 'Maximum capacity is 10 players']
+    max: [15, 'Maximum capacity is 15 players']
   },
   pricePerHour: {
     type: Number,

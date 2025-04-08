@@ -5,7 +5,7 @@ import { toast } from 'react-toastify';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
-const BookingForm = ({ courts, onSuccess }) => {
+const BookingForm = ({ courts = [], onSuccess }) => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -20,7 +20,11 @@ const BookingForm = ({ courts, onSuccess }) => {
     notes: ''
   });
 
-  const [availableTimes, setAvailableTimes] = useState([]);
+  const [availableTimes, setAvailableTimes] = useState([
+    '07:00', '08:00', '09:00', '10:00', '11:00', '12:00',
+    '13:00', '14:00', '15:00', '16:00', '17:00', '18:00',
+    '19:00', '20:00', '21:00'
+  ]);
 
   useEffect(() => {
     if (formData.court && formData.date) {
@@ -30,24 +34,58 @@ const BookingForm = ({ courts, onSuccess }) => {
 
   const fetchAvailableTimes = async () => {
     try {
+      setLoading(true);
       const response = await fetch(`/api/courts/${formData.court}/availability?date=${formData.date.toISOString()}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch available times');
+      }
       const data = await response.json();
-      setAvailableTimes(data.availableTimes);
+      
+      // If we get available times from the API, use those
+      // Otherwise, use the default times
+      if (data.availableTimes && data.availableTimes.length > 0) {
+        setAvailableTimes(data.availableTimes);
+      }
     } catch (error) {
       console.error('Error fetching available times:', error);
-      toast.error('Failed to fetch available times');
+      toast.error('Failed to fetch available times. Using default time slots.');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      };
+      
+      // Calculate end time when start time or duration changes
+      if (name === 'startTime' || name === 'duration') {
+        if (newData.startTime && newData.duration) {
+          const [hours, minutes] = newData.startTime.split(':').map(Number);
+          const endTime = new Date();
+          endTime.setHours(hours + Number(newData.duration), minutes);
+          newData.endTime = `${endTime.getHours().toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        }
+      }
+      
+      return newData;
+    });
   };
 
   const handleDateChange = (date) => {
+    // Validate that the selected date is not in the past
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    
+    if (date < now) {
+      toast.error('Please select a future date');
+      return;
+    }
+    
     setFormData(prev => ({
       ...prev,
       date
@@ -57,6 +95,17 @@ const BookingForm = ({ courts, onSuccess }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+
+    // Validate that the selected time is in the future
+    const selectedDateTime = new Date(formData.date);
+    const [hours, minutes] = formData.startTime.split(':').map(Number);
+    selectedDateTime.setHours(hours, minutes);
+    
+    if (selectedDateTime < new Date()) {
+      toast.error('Please select a future time');
+      setLoading(false);
+      return;
+    }
 
     try {
       const response = await fetch('/api/bookings', {
@@ -98,11 +147,15 @@ const BookingForm = ({ courts, onSuccess }) => {
           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
         >
           <option value="">Select a court</option>
-          {courts.map(court => (
-            <option key={court._id} value={court._id}>
-              {court.name} - Capacity: {court.capacity} players
-            </option>
-          ))}
+          {courts && courts.length > 0 ? (
+            courts.map(court => (
+              <option key={court._id} value={court._id}>
+                {court.name} - Capacity: {court.capacity} players
+              </option>
+            ))
+          ) : (
+            <option value="" disabled>No courts available</option>
+          )}
         </select>
       </div>
 
@@ -127,9 +180,13 @@ const BookingForm = ({ courts, onSuccess }) => {
             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
           >
             <option value="">Select start time</option>
-            {availableTimes.map(time => (
-              <option key={time} value={time}>{time}</option>
-            ))}
+            {availableTimes && availableTimes.length > 0 ? (
+              availableTimes.map(time => (
+                <option key={time} value={time}>{time}</option>
+              ))
+            ) : (
+              <option value="" disabled>No available times</option>
+            )}
           </select>
         </div>
 
@@ -148,6 +205,18 @@ const BookingForm = ({ courts, onSuccess }) => {
           </select>
         </div>
       </div>
+
+      {formData.startTime && formData.duration && (
+        <div>
+          <label className="block text-sm font-medium text-gray-700">End Time</label>
+          <input
+            type="text"
+            value={formData.endTime || ''}
+            readOnly
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 bg-gray-50"
+          />
+        </div>
+      )}
 
       <div>
         <label className="block text-sm font-medium text-gray-700">Number of Players</label>

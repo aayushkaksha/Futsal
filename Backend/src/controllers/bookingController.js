@@ -70,13 +70,13 @@ export const createBooking = asyncHandler(async (req, res) => {
 // @route   GET /api/bookings
 // @access  Private
 export const getBookings = asyncHandler(async (req, res) => {
-  let query = {};
-  
+    let query = {};
+    
   // Filter by user if not admin
-  if (req.user.role !== 'admin') {
-    query.user = req.user.id;
-  }
-  
+    if (req.user.role !== 'admin') {
+      query.user = req.user.id;
+    }
+    
   // Apply filters
   if (req.query.court) query.court = req.query.court;
   if (req.query.status) query.status = req.query.status;
@@ -84,22 +84,22 @@ export const getBookings = asyncHandler(async (req, res) => {
   
   // Date range filter
   if (req.query.startDate && req.query.endDate) {
-    query.date = {
+      query.date = {
       $gte: new Date(req.query.startDate),
       $lte: new Date(req.query.endDate)
-    };
-  }
-  
-  const bookings = await Booking.find(query)
-    .populate('user', 'name email phone')
+      };
+    }
+    
+    const bookings = await Booking.find(query)
+      .populate('user', 'name email phone')
     .populate('court', 'name capacity pricePerHour')
-    .sort({ date: 1, startTime: 1 });
-  
-  res.status(200).json({
-    success: true,
-    count: bookings.length,
-    data: bookings
-  });
+      .sort({ date: 1, startTime: 1 });
+    
+    res.status(200).json({
+      success: true,
+      count: bookings.length,
+      data: bookings
+    });
 });
 
 // @desc    Get single booking
@@ -124,9 +124,9 @@ export const getBooking = asyncHandler(async (req, res) => {
 // @route   PUT /api/bookings/:id
 // @access  Private
 export const updateBooking = asyncHandler(async (req, res) => {
-  let booking = await Booking.findById(req.params.id);
-  
-  if (!booking) {
+    let booking = await Booking.findById(req.params.id);
+    
+    if (!booking) {
     throw new ErrorResponse('Booking not found', 404);
   }
   
@@ -169,27 +169,27 @@ export const cancelBooking = asyncHandler(async (req, res) => {
   }
   
   await booking.save();
-  
-  res.status(200).json({
-    success: true,
-    data: booking
-  });
+    
+    res.status(200).json({
+      success: true,
+      data: booking
+    });
 });
 
 // @desc    Delete booking
 // @route   DELETE /api/bookings/:id
 // @access  Private/Admin
 export const deleteBooking = asyncHandler(async (req, res) => {
-  const booking = await Booking.findById(req.params.id);
-  
-  if (!booking) {
+    const booking = await Booking.findById(req.params.id);
+    
+    if (!booking) {
     throw new ErrorResponse('Booking not found', 404);
-  }
-  
-  await booking.deleteOne();
-  
-  res.status(200).json({
-    success: true,
-    data: {}
+    }
+    
+    await booking.deleteOne();
+    
+    res.status(200).json({
+      success: true,
+      data: {}
   });
 }); 

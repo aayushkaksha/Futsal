@@ -20,7 +20,15 @@ const BookingList = ({
     try {
       setLoading(true);
       const data = await fetchBookings();
-      setBookings(data);
+      // Transform the data to match the expected structure
+      const transformedBookings = data.map(booking => ({
+        ...booking,
+        timeSlot: {
+          startTime: booking.startTime,
+          endTime: booking.endTime
+        }
+      }));
+      setBookings(transformedBookings);
     } catch (error) {
       onError(error.message);
     } finally {
@@ -30,23 +38,48 @@ const BookingList = ({
 
   const handleStatusUpdate = async (bookingId, newStatus) => {
     try {
+      // Optimistically update the UI
+      setBookings(prevBookings => 
+        prevBookings.map(booking => 
+          booking._id === bookingId 
+            ? { ...booking, status: newStatus }
+            : booking
+        )
+      );
+
+      // Make the API call
       await onStatusUpdate(bookingId, newStatus);
       toast.success('Booking status updated successfully');
-      loadBookings(); // Refresh the list
     } catch (error) {
+      // Revert the optimistic update if there's an error
+      setBookings(prevBookings => 
+        prevBookings.map(booking => 
+          booking._id === bookingId 
+            ? { ...booking, status: booking.status } // Revert to original status
+            : booking
+        )
+      );
       onError(error.message);
     }
   };
 
   const handleDelete = async (bookingId) => {
-    if (window.confirm('Are you sure you want to delete this booking?')) {
-      try {
-        await onDelete(bookingId);
-        toast.success('Booking deleted successfully');
-        loadBookings(); // Refresh the list
-      } catch (error) {
-        onError(error.message);
-      }
+    if (!window.confirm('Are you sure you want to delete this booking?')) {
+      return;
+    }
+
+    try {
+      // Optimistically update the UI
+      setBookings(prevBookings => 
+        prevBookings.filter(booking => booking._id !== bookingId)
+      );
+
+      await onDelete(bookingId);
+      toast.success('Booking deleted successfully');
+    } catch (error) {
+      // Revert the optimistic update if there's an error
+      loadBookings();
+      onError(error.message);
     }
   };
 
@@ -115,7 +148,7 @@ const BookingList = ({
                     {format(new Date(booking.date), 'PPP')}
                   </div>
                   <div className="text-sm text-gray-500">
-                    {booking.timeSlot.startTime} - {booking.timeSlot.endTime}
+                    {booking.startTime} - {booking.endTime}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
